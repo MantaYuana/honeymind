@@ -5,3 +5,6 @@ scikit-learn
 psycopg2-binary
 google-genai
 python-dotenv
+pytest
+paramiko
+joblib
