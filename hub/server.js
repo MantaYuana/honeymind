@@ -13,7 +13,7 @@ if (!fs.existsSync(KEY_PATH)) {
   const { privateKey } = crypto.generateKeyPairSync("rsa", {
     modulusLength: 2048,
     publicKeyEncoding: { type: "spki", format: "pem" },
-    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    privateKeyEncoding: { type: "pkcs1", format: "pem" },
   });
   fs.writeFileSync(KEY_PATH, privateKey);
 }
