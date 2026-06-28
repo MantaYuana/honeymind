@@ -62,11 +62,10 @@ async function askAI(sessionId, command) {
 
     redisClient.publish("channel:ai_request", payload);
 
-    // kill if AI too slow
     const timeout = setTimeout(() => {
       redisSub.unsubscribe(responseChannel);
       resolve("bash: " + command.split(" ")[0] + ": command not found");
-    }, 15000);
+    }, 30000);
   });
 }
 
