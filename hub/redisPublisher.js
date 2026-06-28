@@ -14,15 +14,41 @@ redisSub.on("error", (err) => console.log("Redis Sub Error", err));
 
 let isConnected = false;
 
+// Latest tarpit delay (ms) the AI layer has decided for each session, received
+// over channel:session_control. The SSH handler reads this to slow attackers.
+const tarpitBySession = {};
+
 async function connectRedis() {
   if (!isConnected) {
     await redisClient.connect();
     await redisSub.connect();
     isConnected = true;
+
+    // Track per-session tarpit decisions published by the AI layer.
+    await redisSub.subscribe("channel:session_control", (message) => {
+      try {
+        const data = JSON.parse(message);
+        if (data.session_id != null) {
+          tarpitBySession[data.session_id] = data.tarpit_ms || 0;
+        }
+      } catch (e) {
+        console.log("session_control parse error", e);
+      }
+    });
   }
 }
 
 connectRedis();
+
+// Current tarpit delay (ms) for a session; 0 if none decided yet.
+function getTarpitMs(sessionId) {
+  return tarpitBySession[sessionId] || 0;
+}
+
+// Free per-session tarpit state when a session ends.
+function clearSession(sessionId) {
+  delete tarpitBySession[sessionId];
+}
 
 function publishLog(sessionId, ipAddress, command) {
   const payload = JSON.stringify({
@@ -62,15 +88,16 @@ async function askAI(sessionId, command) {
 
     redisClient.publish("channel:ai_request", payload);
 
-    // kill if AI too slow
     const timeout = setTimeout(() => {
       redisSub.unsubscribe(responseChannel);
       resolve("bash: " + command.split(" ")[0] + ": command not found");
-    }, 15000);
+    }, 30000);
   });
 }
 
 module.exports = {
   publishLog,
   askAI,
+  getTarpitMs,
+  clearSession,
 };

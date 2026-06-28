@@ -20,6 +20,7 @@ async def process_ai_request(message):
     session_id = data.get("session_id")
     command = data.get("command")
     response_channel = data.get("response_channel")
+    print(f"[AI] request session={session_id} cmd={command!r}")
     conn = db.get_connection()
     score = db.get_session_score(conn, session_id)
     conn.close()

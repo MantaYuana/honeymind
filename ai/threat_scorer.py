@@ -1,3 +1,5 @@
+from prompt_guard import is_prompt_injection
+
 # Per-command danger weights (heuristic). Cumulative session score now lives in Postgres.
 THREAT_WEIGHTS = {
     'ls': 1, 'pwd': 1, 'whoami': 1, 'ping': 2,
@@ -5,9 +7,15 @@ THREAT_WEIGHTS = {
     'rm': 8, 'nc': 15, 'nmap': 15, 'ssh': 5,
 }
 
+# A prompt-injection attempt is a deliberate, sophisticated attack on the AI
+# itself — weight it heavily so the session escalates quickly.
+INJECTION_WEIGHT = 20
+
 def command_weight(command: str) -> int:
     """Return the danger weight for a single command. 0 if empty, 2 if unknown."""
     if not command or not command.strip():
         return 0
+    if is_prompt_injection(command):
+        return INJECTION_WEIGHT
     cmd_base = command.strip().split(' ')[0]
     return THREAT_WEIGHTS.get(cmd_base, 2)

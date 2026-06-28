@@ -36,14 +36,20 @@ app.prepare().then(async () => {
   redisSub.on("error", (err) => console.log("Redis Sub Error", err));
   await redisSub.connect();
 
-  redisSub.subscribe("channel:ssh_activity", (message) => {
-    try {
-      const parsed = JSON.parse(message);
-      io.emit("ssh_activity", parsed);
-    } catch (e) {
-      console.error("Error parsing redis message", e);
-    }
-  });
+  // Relay each AI/hub Redis channel to the browser over Socket.IO.
+  const relay = (channel, event) => {
+    redisSub.subscribe(channel, (message) => {
+      try {
+        io.emit(event, JSON.parse(message));
+      } catch (e) {
+        console.error(`Error parsing message on ${channel}`, e);
+      }
+    });
+  };
+
+  relay("channel:ssh_activity", "ssh_activity"); // raw command stream
+  relay("channel:intel", "intel"); // per-session score / archetype / tier
+  relay("channel:ioc_feed", "ioc_feed"); // exported IOC bundles (tier 3)
 
   io.on("connection", (socket) => {
     console.log("Client connected to dashboard socket");
