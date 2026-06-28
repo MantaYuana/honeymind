@@ -3,6 +3,9 @@ const fs = require("fs");
 const crypto = require("crypto");
 const path = require("path");
 const { handleCommand } = require("./hybridRouter");
+const { getTarpitMs, clearSession } = require("./redisPublisher");
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const PORT = 2222;
 const KEY_PATH = path.join(__dirname, "host.key");
@@ -13,7 +16,7 @@ if (!fs.existsSync(KEY_PATH)) {
   const { privateKey } = crypto.generateKeyPairSync("rsa", {
     modulusLength: 2048,
     publicKeyEncoding: { type: "spki", format: "pem" },
-    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    privateKeyEncoding: { type: "pkcs1", format: "pem" },
   });
   fs.writeFileSync(KEY_PATH, privateKey);
 }
@@ -71,6 +74,13 @@ const server = new Server(
                 if (command.length > 0) {
                   try {
                     const response = await handleCommand(sessionId, clientIp, command);
+                    // Tarpit: deliberately slow the response based on the tier
+                    // the AI layer has assigned to this session (waste the
+                    // attacker's time as they escalate).
+                    const delay = getTarpitMs(sessionId);
+                    if (delay > 0) {
+                      await sleep(delay);
+                    }
                     if (response) {
                       // fix newlines for PTY
                       const formattedResponse = response.replace(/\n/g, "\r\n");
@@ -106,6 +116,7 @@ const server = new Server(
         });
       })
       .on("close", () => {
+        clearSession(sessionId);
         console.log(`[${sessionId}] Client disconnected`);
       })
       .on("error", (err) => {
